@@ -569,6 +569,47 @@ func cutString(original string) string {
 // The LB needs to be configured with instance addresses on the same
 // subnet as the LB (aka opts.SubnetID).  Currently we're just
 // guessing that the node's InternalIP is the right address.
+// IPFamily will be respected.
+// In case no InternalIP can be found, ExternalIP is tried.
+// If neither InternalIP nor ExternalIP can be found an error is
+// returned.
+func nodeAddressForLBForIPFamily(node *corev1.Node, ipFamily *corev1.IPFamily) (string, error) {
+	klog.V(4).Infof("searching %v for node %v", ipFamily, node.Name)
+	addrs := node.Status.Addresses
+	if len(addrs) == 0 {
+		return "", ErrNoAddressFound
+	}
+
+	allowedAddrTypes := []corev1.NodeAddressType{corev1.NodeInternalIP, corev1.NodeExternalIP}
+
+	for _, allowedAddrType := range allowedAddrTypes {
+		for _, addr := range addrs {
+			if addr.Type == allowedAddrType {
+				klog.V(4).Info("addr.Address: ", addr.Address)
+				ip := net.ParseIP(addr.Address)
+				klog.V(4).Info("ip: ", ip)
+
+				if ip.To4() == nil && *ipFamily == corev1.IPv6Protocol {
+					klog.V(4).Infof("found %v for %v", ip.String(), node.Name)
+					return addr.Address, nil
+				}
+
+				if ip.To4() != nil && *ipFamily == corev1.IPv4Protocol {
+					klog.V(4).Infof("found %v for %v", ip.String(), node.Name)
+					return addr.Address, nil
+				}
+
+				klog.V(4).Infof("%v did not match %v", ip.String(), *ipFamily)
+			}
+		}
+	}
+
+	return "", ErrNoAddressFound
+}
+
+// The LB needs to be configured with instance addresses on the same
+// subnet as the LB (aka opts.SubnetID).  Currently we're just
+// guessing that the node's InternalIP is the right address.
 // In case no InternalIP can be found, ExternalIP is tried.
 // If neither InternalIP nor ExternalIP can be found an error is
 // returned.
@@ -1036,7 +1077,14 @@ func (lbaas *LbaasV2) ensureOctaviaPool(lbID string, listener *listeners.Listene
 	newMembers := sets.NewString()
 
 	for _, node := range nodes {
-		addr, err := nodeAddressForLB(node)
+		var addr string
+		var err error
+		if service.Spec.IPFamily == nil {
+			addr, err = nodeAddressForLB(node)
+		} else {
+			addr, err = nodeAddressForLBForIPFamily(node, service.Spec.IPFamily)
+		}
+
 		if err != nil {
 			if err == ErrNotFound {
 				// Node failure, do not create member
