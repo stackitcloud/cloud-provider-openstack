@@ -882,6 +882,7 @@ func (lbaas *LbaasV2) deleteListeners(lbID string, listenerList []listeners.List
 // Priority of choosing VIP port floating IP:
 // 1. The floating IP that is already attached to the VIP port.
 // 2. Floating IP specified in Spec.LoadBalancerIP
+// 2. Floating IP specified in status
 // 3. Create a new one
 func (lbaas *LbaasV2) getServiceAddress(clusterName string, service *corev1.Service, lb *loadbalancers.LoadBalancer, svcConf *serviceConfig) (string, error) {
 	if svcConf.internal {
@@ -926,7 +927,34 @@ func (lbaas *LbaasV2) getServiceAddress(clusterName string, service *corev1.Serv
 		}
 	}
 
-	// third attempt: create a new floating IP
+	// third attempt: reuse from status
+	loadBalancerIP = service.Status.LoadBalancer.Ingress[0].IP
+	if floatIP == nil && loadBalancerIP != "" {
+		opts := floatingips.ListOpts{
+			FloatingIP: loadBalancerIP,
+		}
+		existingIPs, err := openstackutil.GetFloatingIPs(lbaas.network, opts)
+		if err != nil {
+			return "", fmt.Errorf("failed when trying to get existing floating IP %s, error: %v", loadBalancerIP, err)
+		}
+
+		if len(existingIPs) > 0 {
+			floatingip := existingIPs[0]
+			if len(floatingip.PortID) == 0 {
+				floatUpdateOpts := floatingips.UpdateOpts{
+					PortID: &portID,
+				}
+				floatIP, err = floatingips.Update(lbaas.network, floatingip.ID, floatUpdateOpts).Extract()
+				if err != nil {
+					return "", fmt.Errorf("error updating LB floatingip %+v: %v", floatUpdateOpts, err)
+				}
+			} else {
+				return "", fmt.Errorf("floating IP %s is not available", loadBalancerIP)
+			}
+		}
+	}
+
+	// fourth attempt: create a new floating IP
 	if floatIP == nil {
 		if svcConf.lbPublicNetworkID != "" {
 			klog.V(2).Infof("Creating floating IP %s for loadbalancer %s", loadBalancerIP, lb.ID)
