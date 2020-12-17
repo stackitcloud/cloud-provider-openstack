@@ -969,28 +969,30 @@ func (lbaas *LbaasV2) getServiceAddress(clusterName string, service *corev1.Serv
 	}
 
 	// third attempt: reuse from status
-	loadBalancerIP = service.Status.LoadBalancer.Ingress[0].IP
-	if floatIP == nil && loadBalancerIP != "" {
-		opts := floatingips.ListOpts{
-			FloatingIP: loadBalancerIP,
-		}
-		existingIPs, err := openstackutil.GetFloatingIPs(lbaas.network, opts)
-		if err != nil {
-			return "", fmt.Errorf("failed when trying to get existing floating IP %s, error: %v", loadBalancerIP, err)
-		}
+	if len(service.Status.LoadBalancer.Ingress) > 0 {
+		loadBalancerIP = service.Status.LoadBalancer.Ingress[0].IP
+		if floatIP == nil && loadBalancerIP != "" {
+			opts := floatingips.ListOpts{
+				FloatingIP: loadBalancerIP,
+			}
+			existingIPs, err := openstackutil.GetFloatingIPs(lbaas.network, opts)
+			if err != nil {
+				return "", fmt.Errorf("failed when trying to get existing floating IP %s, error: %v", loadBalancerIP, err)
+			}
 
-		if len(existingIPs) > 0 {
-			floatingip := existingIPs[0]
-			if len(floatingip.PortID) == 0 {
-				floatUpdateOpts := floatingips.UpdateOpts{
-					PortID: &portID,
+			if len(existingIPs) > 0 {
+				floatingip := existingIPs[0]
+				if len(floatingip.PortID) == 0 {
+					floatUpdateOpts := floatingips.UpdateOpts{
+						PortID: &portID,
+					}
+					floatIP, err = floatingips.Update(lbaas.network, floatingip.ID, floatUpdateOpts).Extract()
+					if err != nil {
+						return "", fmt.Errorf("error updating LB floatingip %+v: %v", floatUpdateOpts, err)
+					}
+				} else {
+					return "", fmt.Errorf("floating IP %s is not available", loadBalancerIP)
 				}
-				floatIP, err = floatingips.Update(lbaas.network, floatingip.ID, floatUpdateOpts).Extract()
-				if err != nil {
-					return "", fmt.Errorf("error updating LB floatingip %+v: %v", floatUpdateOpts, err)
-				}
-			} else {
-				return "", fmt.Errorf("floating IP %s is not available", loadBalancerIP)
 			}
 		}
 	}
