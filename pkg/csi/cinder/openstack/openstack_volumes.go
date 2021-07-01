@@ -40,9 +40,9 @@ const (
 	operationFinishInitDelay = 1 * time.Second
 	operationFinishFactor    = 1.1
 	operationFinishSteps     = 10
-	diskAttachInitDelay      = 1 * time.Second
-	diskAttachFactor         = 1.2
-	diskAttachSteps          = 15
+	diskAttachInitDelay      = 7 * time.Second
+	diskAttachFactor         = 1.4
+	diskAttachSteps          = 10
 	diskDetachInitDelay      = 1 * time.Second
 	diskDetachFactor         = 1.2
 	diskDetachSteps          = 13
@@ -200,7 +200,7 @@ func (os *OpenStack) WaitDiskAttached(instanceID string, volumeID string) error 
 	})
 
 	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("Volume %q failed to be attached within the alloted time", volumeID)
+		err = fmt.Errorf("Volume %q failed to be attached within the allowed time", volumeID)
 	}
 
 	return err
