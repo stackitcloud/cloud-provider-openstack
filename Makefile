@@ -30,7 +30,6 @@ DIST_DIRS	= find * -type d -exec
 TEMP_DIR	:=$(shell mktemp -d)
 TAR_FILE	?= rootfs.tar
 
-
 GOOS		?= $(shell go env GOOS)
 VERSION		?= $(shell git describe --exact-match 2> /dev/null || \
 			   git describe --match=$(git rev-parse --short=8 HEAD) --always --dirty --abbrev=8)
