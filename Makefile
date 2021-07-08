@@ -32,7 +32,7 @@ TAR_FILE	?= rootfs.tar
 
 GOOS		?= $(shell go env GOOS)
 VERSION		?= $(shell git describe --exact-match > /dev/null || \
-			   git describe --tags --always --abbrev=6)-ske
+			   git describe --tags --always --abbrev=6)
 ALPINE_ARCH	:=
 DEBIAN_ARCH	:=
 QEMUARCH	:=
