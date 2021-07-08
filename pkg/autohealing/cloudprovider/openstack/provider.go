@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/startstop"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
@@ -60,12 +61,18 @@ var statusesPreventingRepair = sets.NewString(
 	stackStatusUpdateFailed,
 )
 
+// Cache the unhealthy nodes, if it's the first time we found this
+// unhealthy node, then we just reboot it and save it in this list. If it's not
+// the first time we found this unhealthy node, we will rebuild it.
+var unHealthyNodes = make(map[string]healthcheck.NodeInfo)
+
 // OpenStack is an implementation of cloud provider Interface for OpenStack.
 type OpenStackCloudProvider struct {
 	KubeClient           kubernetes.Interface
 	Nova                 *gophercloud.ServiceClient
 	Heat                 *gophercloud.ServiceClient
 	Magnum               *gophercloud.ServiceClient
+	Cinder               *gophercloud.ServiceClient
 	Config               config.Config
 	ResourceStackMapping map[string]ResourceStackRelationship
 }
@@ -184,23 +191,44 @@ func (provider OpenStackCloudProvider) waitForClusterComplete(clusterID string, 
 	return err
 }
 
-func (provider OpenStackCloudProvider) waitForServerDetachVolumes(serverID string, timeout time.Duration) error {
+// waitForServerDetachVolumes will detach all the attached volumes from the given
+// server with the timeout. And if there is a root volume of the server, the root
+// volume ID will be returned.
+func (provider OpenStackCloudProvider) waitForServerDetachVolumes(serverID string, timeout time.Duration) (string, error) {
+	rootVolumeID := ""
 	err := volumeattach.List(provider.Nova, serverID).EachPage(func(page pagination.Page) (bool, error) {
 		attachments, err := volumeattach.ExtractVolumeAttachments(page)
 		if err != nil {
 			return false, err
 		}
 		for _, attachment := range attachments {
-			log.Infof("detaching volume %s for instance %s", attachment.VolumeID, serverID)
-			err := volumeattach.Delete(provider.Nova, serverID, attachment.ID).ExtractErr()
+			volume, err := volumes.Get(provider.Cinder, attachment.VolumeID).Extract()
 			if err != nil {
-				return false, fmt.Errorf("failed to detach volume %s from instance %s", attachment.VolumeID, serverID)
+				return false, fmt.Errorf("failed to get volume %s, error: %s", attachment.VolumeID, err)
+			}
+
+			bootable, err := strconv.ParseBool(volume.Bootable)
+			if err != nil {
+				log.Warningf("Unexpected value for bootable volume %v in volume %s, error %v", volume.Bootable, attachment.VolumeID, err)
+			}
+
+			log.Infof("volume %s is bootable %t", attachment.VolumeID, bootable)
+
+			if bootable == false {
+				log.Infof("detaching volume %s for instance %s", attachment.VolumeID, serverID)
+				err := volumeattach.Delete(provider.Nova, serverID, attachment.ID).ExtractErr()
+				if err != nil {
+					return false, fmt.Errorf("failed to detach volume %s from instance %s, error: %s", attachment.VolumeID, serverID, err)
+				}
+			} else {
+				rootVolumeID = attachment.VolumeID
+				log.Infof("the root volume for server %s is %s", serverID, attachment.VolumeID)
 			}
 		}
 		return true, err
 	})
 	if err != nil {
-		return err
+		return rootVolumeID, err
 	}
 	err = wait.Poll(3*time.Second, timeout,
 		func() (bool, error) {
@@ -209,20 +237,87 @@ func (provider OpenStackCloudProvider) waitForServerDetachVolumes(serverID strin
 				return false, err
 			}
 
-			if len(server.AttachedVolumes) == 0 {
+			if len(server.AttachedVolumes) == 0 && rootVolumeID == "" {
+				return true, nil
+			} else if len(server.AttachedVolumes) == 1 && rootVolumeID != "" {
+				// Root volume is left
 				return true, nil
 			}
 
 			return false, nil
 		})
 
-	return err
+	return rootVolumeID, err
 }
 
-// For master nodes: Soft deletes the VMs, marks the heat resource "unhealthy" then trigger Heat stack update in order to rebuild
-// the VMs. The information this function needs:
-//     - Nova VM IDs
-// 	   - Heat stack ID and resource ID.
+// FirstTimeRepair Handle the first time repair for a node
+// 1) If the node is the first time in error, reboot and uncordon it
+// 2) If the node is not the first time in error, check if the last reboot time is in provider.Config.RebuildDelayAfterReboot
+//    That said, if the node has been found in broken status before but has been long time since then, the processed variable
+//    will be kept as False, which means the node need to be rebuilt to fix it, otherwise it means the has been processed.
+// The bool type return value means that if the node has been processed from a first time repair PoV
+func (provider OpenStackCloudProvider) firstTimeRepair(n healthcheck.NodeInfo, serverID string, firstTimeRebootNodes map[string]healthcheck.NodeInfo) (bool, error) {
+	var firstTimeUnhealthy = true
+	for id := range unHealthyNodes {
+		log.V(5).Infof("comparing server ID %s with known broken ID %s", serverID, id)
+		if id == serverID {
+			log.Infof("it is NOT the first time that node %s is being repaired", serverID)
+			firstTimeUnhealthy = false
+			break
+		}
+	}
+
+	var processed = false
+	if firstTimeUnhealthy == true {
+		log.Infof("rebooting node %s to repair it", serverID)
+
+		if res := servers.Reboot(provider.Nova, serverID, servers.RebootOpts{Type: servers.SoftReboot}); res.Err != nil {
+			// Usually it means the node is being rebooted
+			log.Warningf("failed to reboot node %s, error: %v", serverID, res.Err)
+			if strings.Contains(res.Err.Error(), "reboot_started") {
+				// The node has been restarted
+				firstTimeRebootNodes[serverID] = n
+				processed = true
+			}
+		} else {
+			// Uncordon the node
+			if n.IsWorker == true {
+				nodeName := n.KubeNode.Name
+				newNode := n.KubeNode.DeepCopy()
+				newNode.Spec.Unschedulable = false
+				if _, err := provider.KubeClient.CoreV1().Nodes().Update(context.TODO(), newNode, metav1.UpdateOptions{}); err != nil {
+					log.Errorf("Failed to cordon node %s, error: %v", nodeName, err)
+				} else {
+					log.Infof("Node %s is cordoned", nodeName)
+				}
+			}
+
+			n.RebootAt = time.Now()
+			firstTimeRebootNodes[serverID] = n
+			unHealthyNodes[serverID] = n
+			log.Infof("Node %s has been rebooted at %s", serverID, n.RebootAt)
+		}
+		processed = true
+	} else {
+		// If the node was rebooted within mins (defined by RepairDelayAfterReboot), ignore it
+		log.Infof("Node %s is found in unhealthy again which was rebooted at %s", serverID, unHealthyNodes[serverID].RebootAt)
+		if unHealthyNodes[serverID].RebootAt.After(time.Now().Add(-1 * provider.Config.RebuildDelayAfterReboot)) {
+			log.Infof("Node %s is found in unhealthy again, but we're going to defer the repair because it maybe in reboot process", serverID)
+			firstTimeRebootNodes[serverID] = n
+			processed = true
+		}
+	}
+
+	return processed, nil
+}
+
+// Repair  For master nodes: detach etcd and docker volumes, find the root
+//         volume, then shutdown the VM, marks the both the VM and the root
+//         volume (heat resource) as "unhealthy" then trigger Heat stack update
+//         in order to rebuild the node. The information this function needs:
+//         - Nova VM ID
+//         - Root volume ID
+// 	       - Heat stack ID and resource ID.
 // For worker nodes: Call Magnum resize API directly.
 func (provider OpenStackCloudProvider) Repair(nodes []healthcheck.NodeInfo) error {
 	if len(nodes) == 0 {
@@ -234,15 +329,18 @@ func (provider OpenStackCloudProvider) Repair(nodes []healthcheck.NodeInfo) erro
 
 	clusterName := provider.Config.ClusterName
 	isWorkerNode := nodes[0].IsWorker
+	log.Infof("the node type to be repaired is worker node: %t", isWorkerNode)
 	if isWorkerNode {
 		workers = nodes
 	} else {
 		masters = nodes
 	}
 
+	firstTimeRebootNodes := make(map[string]healthcheck.NodeInfo)
+
 	err := provider.UpdateHealthStatus(masters, workers)
 	if err != nil {
-		return fmt.Errorf("Failed to update the helath status of cluster %s, error: %v", clusterName, err)
+		return fmt.Errorf("failed to update the helath status of cluster %s, error: %v", clusterName, err)
 	}
 
 	cluster, err := clusters.Get(provider.Magnum, clusterName).Extract()
@@ -260,7 +358,14 @@ func (provider OpenStackCloudProvider) Repair(nodes []healthcheck.NodeInfo) erro
 			}
 			serverID := machineID.String()
 
-			if err := provider.waitForServerDetachVolumes(serverID, 30*time.Second); err != nil {
+			if processed, err := provider.firstTimeRepair(n, serverID, firstTimeRebootNodes); err != nil {
+				log.Warningf("Failed to process if the node %s is in first time repair , error: %v", serverID, err)
+			} else if processed == true {
+				log.Infof("Node %s has been processed", serverID)
+				continue
+			}
+
+			if _, err := provider.waitForServerDetachVolumes(serverID, 30*time.Second); err != nil {
 				log.Warningf("Failed to detach volumes from server %s, error: %v", serverID, err)
 			}
 
@@ -292,6 +397,7 @@ func (provider OpenStackCloudProvider) Repair(nodes []healthcheck.NodeInfo) erro
 			//	return fmt.Errorf("failed to resize cluster %s, error: %v", clusterName, ret.Err)
 			//}
 
+			delete(unHealthyNodes, serverID)
 			log.Infof("Cluster %s resized", clusterName)
 		}
 	} else {
@@ -307,28 +413,57 @@ func (provider OpenStackCloudProvider) Repair(nodes []healthcheck.NodeInfo) erro
 			return fmt.Errorf("failed to get the resource stack mapping for cluster %s, error: %v", clusterName, err)
 		}
 
+		opts := stackresources.MarkUnhealthyOpts{
+			MarkUnhealthy:        true,
+			ResourceStatusReason: "Mark resource unhealthy by autohealing service",
+		}
+
 		for _, n := range nodes {
-			id := uuid.Parse(n.KubeNode.Status.NodeInfo.MachineID)
-			if id == nil {
+			machineID := uuid.Parse(n.KubeNode.Status.NodeInfo.MachineID)
+			if machineID == nil {
 				log.Warningf("Failed to get the correct server ID for server %s", n.KubeNode.Name)
 				continue
 			}
-			serverID := id.String()
+			serverID := machineID.String()
 
-			if err := provider.waitForServerPoweredOff(serverID, 30*time.Second); err != nil {
+			if processed, err := provider.firstTimeRepair(n, serverID, firstTimeRebootNodes); err != nil {
+				log.Warningf("Failed to process if the node %s is in first time repair , error: %v", serverID, err)
+			} else if processed == true {
+				log.Infof("Node %s has been processed", serverID)
+				continue
+			}
+
+			if rootVolumeID, err := provider.waitForServerDetachVolumes(serverID, 30*time.Second); err != nil {
+				log.Warningf("Failed to detach volumes from server %s, error: %v", serverID, err)
+			} else {
+				// Mark root volume as unhealthy
+				if rootVolumeID != "" {
+					err = stackresources.MarkUnhealthy(provider.Heat, allMapping[serverID].StackName, allMapping[serverID].StackID, rootVolumeID, opts).ExtractErr()
+					if err != nil {
+						log.Errorf("failed to mark resource %s unhealthy, error: %v", rootVolumeID, err)
+					}
+				}
+			}
+
+			if err := provider.waitForServerPoweredOff(serverID, 180*time.Second); err != nil {
 				log.Warningf("Failed to shutdown the server %s, error: %v", serverID, err)
+				// If the server is failed to delete after 180s, then delete it to avoid the
+				// stack update failure later.
+				res := servers.ForceDelete(provider.Nova, serverID)
+				if res.Err != nil {
+					log.Warningf("Failed to delete the server %s, error: %v", serverID, err)
+				}
 			}
 
 			log.Infof("Marking Nova VM %s(Heat resource %s) unhealthy for Heat stack %s", serverID, allMapping[serverID].ResourceID, cluster.StackID)
 
-			opts := stackresources.MarkUnhealthyOpts{
-				MarkUnhealthy:        true,
-				ResourceStatusReason: "Mark resource unhealthy by autohealing service",
-			}
+			// Mark VM as unhealthy
 			err = stackresources.MarkUnhealthy(provider.Heat, allMapping[serverID].StackName, allMapping[serverID].StackID, allMapping[serverID].ResourceID, opts).ExtractErr()
 			if err != nil {
 				log.Errorf("failed to mark resource %s unhealthy, error: %v", serverID, err)
 			}
+
+			delete(unHealthyNodes, serverID)
 		}
 
 		if err := stacks.UpdatePatch(provider.Heat, clusterStackName, cluster.StackID, stacks.UpdateOpts{}).ExtractErr(); err != nil {
@@ -340,6 +475,11 @@ func (provider OpenStackCloudProvider) Repair(nodes []healthcheck.NodeInfo) erro
 
 	// Remove the broken nodes from the cluster
 	for _, n := range nodes {
+		serverID := uuid.Parse(n.KubeNode.Status.NodeInfo.MachineID).String()
+		if _, found := firstTimeRebootNodes[serverID]; found {
+			log.Infof("Skip node delete for %s because it's repaired by reboot", serverID)
+			continue
+		}
 		if err := provider.KubeClient.CoreV1().Nodes().Delete(context.TODO(), n.KubeNode.Name, metav1.DeleteOptions{}); err != nil {
 			log.Errorf("Failed to remove the node %s from cluster, error: %v", n.KubeNode.Name, err)
 		}
