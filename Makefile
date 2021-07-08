@@ -41,7 +41,7 @@ GOARCH		:=
 GOFLAGS		:=
 TAGS		:=
 LDFLAGS		:= "-w -s -X 'k8s.io/cloud-provider-openstack/pkg/version.Version=${VERSION}'"
-REGISTRY	?= registry.ske.eu01.stackit.cloud/test
+REGISTRY	?= registry.ske.eu01.stackit.cloud/gardener-ds
 IMAGE_OS	?= linux
 IMAGE_NAMES	?= openstack-cloud-controller-manager \
 				cinder-csi-plugin \
