@@ -282,7 +282,7 @@ push-image-%:
 ifneq ($(and $(DOCKER_USERNAME),$(DOCKER_PASSWORD)),)
 	@docker login -u="$(DOCKER_USERNAME)" -p="$(DOCKER_PASSWORD)"
 endif
-	docker push $(REGISTRY)/$*-$(ARCH):$(VERSION)
+	docker push $(REGISTRY)/$*:$(VERSION)
 
 images: $(addprefix build-arch-image-,$(ARCH))
 
