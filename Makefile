@@ -268,7 +268,7 @@ endif
 	docker export build-$*-$(ARCH) > $(TEMP_DIR)/$*/$(TAR_FILE)
 
 	@echo "build image $(REGISTRY)/$*-$(ARCH)"
-	docker build --build-arg ALPINE_ARCH=$(ALPINE_ARCH) --build-arg ARCH=$(ARCH) --build-arg DEBIAN_ARCH=$(DEBIAN_ARCH) --pull -t $(REGISTRY)/$*-$(VERSION) $(TEMP_DIR)/$*
+	docker build --build-arg ALPINE_ARCH=$(ALPINE_ARCH) --build-arg ARCH=$(ARCH) --build-arg DEBIAN_ARCH=$(DEBIAN_ARCH) --pull -t $(REGISTRY)/$*-$(ARCH):$(VERSION) $(TEMP_DIR)/$*
 
 	rm -rf $(TEMP_DIR)/$*
 	docker rm build-$*-$(ARCH)
@@ -282,7 +282,7 @@ push-image-%:
 ifneq ($(and $(DOCKER_USERNAME),$(DOCKER_PASSWORD)),)
 	@docker login -u="$(DOCKER_USERNAME)" -p="$(DOCKER_PASSWORD)"
 endif
-	docker push $(REGISTRY)/$*:$(VERSION)
+	docker push $(REGISTRY)/$*-$(ARCH):$(VERSION)
 
 images: $(addprefix build-arch-image-,$(ARCH))
 
