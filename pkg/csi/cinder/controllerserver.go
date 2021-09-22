@@ -18,7 +18,9 @@ package cinder
 
 import (
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"strconv"
+	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/snapshots"
@@ -94,12 +96,16 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		if volSizeGB != volumes[0].Size {
 			return nil, status.Error(codes.AlreadyExists, "Volume Already exists with same name and different capacity")
 		}
+
+		if volumes[0].Status != openstack.VolumeAvailableStatus {
+			return nil, status.Error(codes.Internal, fmt.Sprintf("Volume %s is not in available state", volumes[0].ID))
+		}
+
 		klog.V(4).Infof("Volume %s already exists in Availability Zone: %s of size %d GiB", volumes[0].ID, volumes[0].AvailabilityZone, volumes[0].Size)
 		return getCreateVolumeResponse(&volumes[0], ignoreVolumeAZ, req.GetAccessibilityRequirements()), nil
 	} else if len(volumes) > 1 {
 		klog.V(3).Infof("found multiple existing volumes with selected name (%s) during create", volName)
 		return nil, status.Error(codes.Internal, "Multiple volumes reported by Cinder with same name")
-
 	}
 
 	// Volume Create
@@ -137,11 +143,21 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}
 
 	vol, err := cloud.CreateVolume(volName, volSizeGB, volType, volAvailability, snapshotID, sourcevolID, &properties)
-
 	if err != nil {
 		klog.Errorf("Failed to CreateVolume: %v", err)
 		return nil, status.Error(codes.Internal, fmt.Sprintf("CreateVolume failed with error %v", err))
+	}
 
+	targetStatus := []string{openstack.VolumeAvailableStatus}
+	err = cloud.WaitVolumeTargetStatusWithCustomBackoff(vol.ID, targetStatus,
+		&wait.Backoff{
+			Duration: 20 * time.Second,
+			Steps:    5,
+			Factor:   1.28,
+		})
+	if err != nil {
+		klog.Errorf("Failed to WaitVolumeTargetStatus of volume %s: %v", vol.ID, err)
+		return nil, status.Error(codes.Internal, fmt.Sprintf("CreateVolume Volume %s failed getting available in time: %v", vol.ID, err))
 	}
 
 	klog.V(4).Infof("CreateVolume: Successfully created volume %s in Availability Zone: %s of size %d GiB", vol.ID, vol.AvailabilityZone, vol.Size)

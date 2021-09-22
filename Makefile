@@ -33,12 +33,18 @@ TAR_FILE	?= rootfs.tar
 GOOS		?= $(shell go env GOOS)
 GOPROXY		?= $(shell go env GOPROXY)
 VERSION         ?= $(shell git describe --dirty --tags --match='v*')
+VERSION		?= $(shell git describe --exact-match > /dev/null || \
+			   git describe --tags --always --abbrev=6)
+ALPINE_ARCH	:=
+DEBIAN_ARCH	:=
+QEMUARCH	:=
+QEMUVERSION	:= "v4.2.0-4"
 GOARCH		:=
 GOFLAGS		:=
 TAGS		:=
 LDFLAGS		:= "-w -s -X 'k8s.io/component-base/version.gitVersion=$(VERSION)' -X 'k8s.io/cloud-provider-openstack/pkg/version.Version=$(VERSION)'"
 GOX_LDFLAGS	:= $(shell echo "$(LDFLAGS) -extldflags \"-static\"")
-REGISTRY	?= registry.k8s.io/provider-os
+REGISTRY	?= reg.infra.ske.eu01.stackit.cloud/stackitcloud
 IMAGE_OS	?= linux
 IMAGE_NAMES	?= openstack-cloud-controller-manager \
 				cinder-csi-plugin \
