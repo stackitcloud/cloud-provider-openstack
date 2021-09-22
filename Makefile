@@ -31,8 +31,8 @@ TEMP_DIR	:=$(shell mktemp -d)
 TAR_FILE	?= rootfs.tar
 
 GOOS		?= $(shell go env GOOS)
-GIT_VERSION     := $(shell git describe --dirty --tags --match='v*')
-VERSION         ?= $(GIT_VERSION)
+VERSION		?= $(shell git describe --exact-match > /dev/null || \
+			   git describe --tags --always --abbrev=6)
 ALPINE_ARCH	:=
 DEBIAN_ARCH	:=
 QEMUARCH	:=
@@ -42,7 +42,7 @@ GOFLAGS		:=
 TAGS		:=
 LDFLAGS		:= "-w -s -X 'k8s.io/component-base/version.gitVersion=$(VERSION)'"
 GOX_LDFLAGS	:= $(shell echo "$(LDFLAGS) -extldflags \"-static\"")
-REGISTRY	?= k8scloudprovider
+REGISTRY	?= reg.infra.ske.eu01.stackit.cloud/stackitcloud
 IMAGE_OS	?= linux
 IMAGE_NAMES	?= openstack-cloud-controller-manager \
 				cinder-csi-plugin \
@@ -122,9 +122,9 @@ manila-csi-plugin: work $(SOURCES)
 # Remove this individual go build target, once we remove
 # image-controller-manager below.
 openstack-cloud-controller-manager: work $(SOURCES)
-	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go build \
+	CGO_ENABLED=0 GOOS=$(GOOS) go build \
 		-ldflags $(LDFLAGS) \
-		-o openstack-cloud-controller-manager-$(ARCH) \
+		-o openstack-cloud-controller-manager \
 		cmd/openstack-cloud-controller-manager/main.go
 
 # Remove individual image builder once we migrate openlab-zuul-jobs
