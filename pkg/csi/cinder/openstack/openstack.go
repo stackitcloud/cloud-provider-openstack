@@ -28,6 +28,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/spf13/pflag"
 	gcfg "gopkg.in/gcfg.v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cloud-provider-openstack/pkg/client"
 	"k8s.io/cloud-provider-openstack/pkg/metrics"
 	"k8s.io/cloud-provider-openstack/pkg/util/metadata"
@@ -52,6 +53,7 @@ type IOpenStack interface {
 	DetachVolume(instanceID, volumeID string) error
 	WaitDiskDetached(instanceID string, volumeID string) error
 	WaitVolumeTargetStatus(volumeID string, tStatus []string) error
+	WaitVolumeTargetStatusWithCustomBackoff(volumeID string, tStatus []string, backoff *wait.Backoff) error
 	GetAttachmentDiskPath(instanceID, volumeID string) (string, error)
 	GetVolume(volumeID string) (*volumes.Volume, error)
 	GetVolumesByName(name string) ([]volumes.Volume, error)
