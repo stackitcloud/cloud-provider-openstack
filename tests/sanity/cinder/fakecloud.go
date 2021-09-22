@@ -10,6 +10,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/snapshots"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cloud-provider-openstack/pkg/csi/cinder"
 	"k8s.io/cloud-provider-openstack/pkg/csi/cinder/openstack"
 	"k8s.io/cloud-provider-openstack/pkg/util/metadata"
@@ -112,6 +113,10 @@ func (cloud *cloud) WaitDiskDetached(instanceID string, volumeID string) error {
 }
 
 func (cloud *cloud) WaitVolumeTargetStatus(volumeID string, tStatus []string) error {
+	return nil
+}
+
+func (cloud *cloud) WaitVolumeTargetStatusWithCustomBackoff(volumeID string, tStatus []string, backoff *wait.Backoff) error {
 	return nil
 }
 
