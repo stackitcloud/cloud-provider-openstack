@@ -18,6 +18,7 @@ package openstack
 
 import (
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"os"
 
 	"github.com/gophercloud/gophercloud"
@@ -49,6 +50,7 @@ type IOpenStack interface {
 	DetachVolume(instanceID, volumeID string) error
 	WaitDiskDetached(instanceID string, volumeID string) error
 	WaitVolumeTargetStatus(volumeID string, tStatus []string) error
+	WaitVolumeTargetStatusWithCustomBackoff(volumeID string, tStatus []string, backoff *wait.Backoff) error
 	GetAttachmentDiskPath(instanceID, volumeID string) (string, error)
 	GetVolume(volumeID string) (*volumes.Volume, error)
 	GetVolumesByName(name string) ([]volumes.Volume, error)

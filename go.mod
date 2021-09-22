@@ -120,7 +120,7 @@ require (
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.19.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8 // indirect
-	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
+	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4 // indirect
 	golang.org/x/term v0.3.0 // indirect
 	golang.org/x/text v0.5.0 // indirect
 	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8 // indirect
@@ -151,6 +151,7 @@ require (
 
 replace (
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc9
+	github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.11.1
 	google.golang.org/grpc v1.34.0 => google.golang.org/grpc v1.29.0
 	k8s.io/api => k8s.io/api v0.24.0
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.24.0
