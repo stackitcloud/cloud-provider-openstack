@@ -34,7 +34,7 @@ TAR_FILE	?= rootfs.tar
 
 GOOS		?= $(shell go env GOOS)
 VERSION		?= $(shell git describe --exact-match > /dev/null || \
-			   git describe --tags --always --abbrev=6)-ske
+			   git describe --tags --always --abbrev=6)
 ALPINE_ARCH	:=
 DEBIAN_ARCH	:=
 QEMUARCH	:=
@@ -44,7 +44,7 @@ GOFLAGS		:=
 TAGS		:=
 LDFLAGS		:= "-w -s -X 'k8s.io/cloud-provider-openstack/pkg/version.Version=${VERSION}'"
 GOX_LDFLAGS	:= $(shell echo "$(LDFLAGS) -extldflags \"-static\"")
-REGISTRY	?= registry.ske.eu01.stackit.cloud/gardener-ds
+REGISTRY	?= reg.infra.ske.eu01.stackit.cloud/stackitcloud
 IMAGE_OS	?= linux
 IMAGE_NAMES	?= openstack-cloud-controller-manager \
 				cinder-csi-plugin \
