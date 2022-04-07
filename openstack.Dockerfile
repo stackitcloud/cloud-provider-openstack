@@ -18,20 +18,20 @@ FROM base AS build
 RUN --mount=target=. \
     --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    go build -ldflags="-w -s" -o /app/main cmd/cinder-csi-plugin/main.go
+    go build -ldflags="-w -s" -o /app/main cmd/openstack-cloud-controller-manager/main.go
 
-FROM k8s.gcr.io/build-image/debian-base-amd64:v2.1.3
+FROM amd64/alpine:3.11
 
-LABEL name="cinder-csi-plugin" \
+LABEL name="openstack-cloud-controller-manager" \
       license="Apache Version 2.0" \
       maintainers="Kubernetes Authors" \
-      description="Cinder CSI Plugin" \
-      architecture=amd64 \
+      description="OpenStack cloud controller manager" \
+      architecture=$ARCH \
       distribution-scope="public" \
-      summary="Cinder CSI Plugin" \
+      summary="OpenStack cloud controller manager" \
       help="none"
 
-RUN clean-install ca-certificates e2fsprogs mount xfsprogs udev
+RUN apk add --no-cache ca-certificates
 
 COPY --from=build /app/main /bin/controller
 USER 65532:65532
