@@ -34,5 +34,4 @@ LABEL name="cinder-csi-plugin" \
 RUN clean-install ca-certificates e2fsprogs mount xfsprogs udev
 
 COPY --from=build /app/main /bin/controller
-USER 65532:65532
 ENTRYPOINT ["/bin/controller"]
