@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.3-labs
-ARG GO_VERSION=1.16
+ARG GO_VERSION=1.17
 
 FROM golang:${GO_VERSION} AS base
 ENV GO111MODULE=on
