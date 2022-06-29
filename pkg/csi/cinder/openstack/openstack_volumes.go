@@ -271,6 +271,33 @@ func (os *OpenStack) WaitVolumeTargetStatus(volumeID string, tStatus []string) e
 	return waitErr
 }
 
+//WaitVolumeTargetStatusWithCustomBackoff waits for volume to be in target state with custom backoff
+func (os *OpenStack) WaitVolumeTargetStatusWithCustomBackoff(volumeID string, tStatus []string, backoff *wait.Backoff) error {
+	waitErr := wait.ExponentialBackoff(*backoff, func() (bool, error) {
+		vol, err := os.GetVolume(volumeID)
+		if err != nil {
+			return false, err
+		}
+		for _, t := range tStatus {
+			if vol.Status == t {
+				return true, nil
+			}
+		}
+		for _, eState := range volumeErrorStates {
+			if vol.Status == eState {
+				return false, fmt.Errorf("Volume is in Error State : %s", vol.Status)
+			}
+		}
+		return false, nil
+	})
+
+	if waitErr == wait.ErrWaitTimeout {
+		waitErr = fmt.Errorf("Timeout on waiting for volume %s status to be in %v", volumeID, tStatus)
+	}
+
+	return waitErr
+}
+
 // DetachVolume detaches given cinder volume from the compute
 func (os *OpenStack) DetachVolume(instanceID, volumeID string) error {
 	volume, err := os.GetVolume(volumeID)
