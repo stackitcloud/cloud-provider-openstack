@@ -1,5 +1,4 @@
-# syntax=docker/dockerfile:1.3-labs
-ARG GO_VERSION=1.17
+ARG GO_VERSION=1.19
 
 FROM golang:${GO_VERSION} AS base
 ENV GO111MODULE=on
@@ -8,17 +7,16 @@ ENV GOOS=linux
 ENV GOARCH=amd64
 
 WORKDIR /src
-COPY go.* .
+COPY go.mod ./
+COPY go.sum ./
 
-RUN --mount=type=cache,target=/go/pkg/mod \
-    go mod download
+RUN go mod download
 
 FROM base AS build
 
-RUN --mount=target=. \
-    --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    go build -ldflags="-w -s" -o /app/main cmd/cinder-csi-plugin/main.go
+COPY . ./
+
+RUN go build -ldflags="-w -s" -o /app/main cmd/cinder-csi-plugin/main.go
 
 FROM k8s.gcr.io/build-image/debian-base-amd64:v2.1.3
 
