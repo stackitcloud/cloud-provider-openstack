@@ -18,7 +18,7 @@ COPY . ./
 
 RUN go build -ldflags="-w -s" -o /app/main cmd/cinder-csi-plugin/main.go
 
-FROM k8s.gcr.io/build-image/debian-base-amd64:v2.1.3
+FROM k8s.gcr.io/build-image/debian-base-amd64:bullseye-v1.4.2
 
 LABEL name="cinder-csi-plugin" \
       license="Apache Version 2.0" \
