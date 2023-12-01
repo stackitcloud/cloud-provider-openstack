@@ -104,27 +104,6 @@ LABEL name="barbican-kms-plugin" \
 CMD ["sh", "-c", "/bin/barbican-kms-plugin --socketpath ${socketpath} --cloud-config ${cloudconfig}"]
 
 ##
-## cinder-csi-plugin
-##
-FROM --platform=${TARGETPLATFORM} ${DEBIAN_IMAGE} as cinder-csi-plugin
-
-# Install e4fsprogs for format
-RUN clean-install btrfs-progs e2fsprogs mount udev xfsprogs
-
-COPY --from=builder /build/cinder-csi-plugin /bin/cinder-csi-plugin
-COPY --from=certs /etc/ssl/certs /etc/ssl/certs
-
-LABEL name="cinder-csi-plugin" \
-      license="Apache Version 2.0" \
-      maintainers="Kubernetes Authors" \
-      description="Cinder CSI Plugin" \
-      distribution-scope="public" \
-      summary="Cinder CSI Plugin" \
-      help="none"
-
-CMD ["/bin/cinder-csi-plugin"]
-
-##
 ## k8s-keystone-auth
 ##
 FROM --platform=${TARGETPLATFORM} ${DISTROLESS_IMAGE} as k8s-keystone-auth
@@ -200,3 +179,25 @@ LABEL name="octavia-ingress-controller" \
       help="none"
 
 CMD ["/bin/octavia-ingress-controller"]
+
+##
+## cinder-csi-plugin
+##
+## SKE: Concourse only pushes the last built image. Therefore we have to move this to the bottom.
+FROM --platform=${TARGETPLATFORM} ${DEBIAN_IMAGE} as cinder-csi-plugin
+
+# Install e4fsprogs for format
+RUN clean-install btrfs-progs e2fsprogs mount udev xfsprogs
+
+COPY --from=builder /build/cinder-csi-plugin /bin/cinder-csi-plugin
+COPY --from=certs /etc/ssl/certs /etc/ssl/certs
+
+LABEL name="cinder-csi-plugin" \
+      license="Apache Version 2.0" \
+      maintainers="Kubernetes Authors" \
+      description="Cinder CSI Plugin" \
+      distribution-scope="public" \
+      summary="Cinder CSI Plugin" \
+      help="none"
+
+CMD ["/bin/cinder-csi-plugin"]
