@@ -33,12 +33,6 @@ TAR_FILE	?= rootfs.tar
 GOOS		?= $(shell go env GOOS)
 GOPROXY		?= $(shell go env GOPROXY)
 VERSION         ?= $(shell git describe --dirty --tags --match='v*')
-VERSION		?= $(shell git describe --exact-match > /dev/null || \
-			   git describe --tags --always --abbrev=6)
-ALPINE_ARCH	:=
-DEBIAN_ARCH	:=
-QEMUARCH	:=
-QEMUVERSION	:= "v4.2.0-4"
 GOARCH		:=
 GOFLAGS		:=
 TAGS		:=
