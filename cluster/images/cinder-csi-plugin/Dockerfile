@@ -10,19 +10,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG DEBIAN_ARCH=amd64
+ARG TARGETARCH
 # We not using scratch because we need to keep the basic image information
 # from parent image
-FROM k8s.gcr.io/build-image/debian-base-${DEBIAN_ARCH}:bullseye-v1.4.2
-
-ARG ARCH=amd64
+FROM k8s.gcr.io/build-image/debian-base-${TARGETARCH}:bullseye-v1.4.2
 
 # Fill out the labels
 LABEL name="cinder-csi-plugin" \
       license="Apache Version 2.0" \
       maintainers="Kubernetes Authors" \
       description="Cinder CSI Plugin" \
-      architecture=$ARCH \
+      architecture=$TARGETARCH \
       distribution-scope="public" \
       summary="Cinder CSI Plugin" \
       help="none"
