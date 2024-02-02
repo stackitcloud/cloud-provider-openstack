@@ -49,6 +49,7 @@ func TestCreateVolume(t *testing.T) {
 	osmock.On("CreateVolume", FakeVolName, mock.AnythingOfType("int"), FakeVolType, FakeAvailability, "", "", &properties).Return(&FakeVol, nil)
 
 	osmock.On("GetVolumesByName", FakeVolName).Return(FakeVolListEmpty, nil)
+	osmock.On("WaitVolumeTargetStatusWithCustomBackoff", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	// Init assert
 	assert := assert.New(t)
 
