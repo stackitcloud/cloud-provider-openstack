@@ -25,6 +25,7 @@ import (
 	"github.com/gophercloud/gophercloud/v2/openstack/blockstorage/v3/volumes"
 	"github.com/gophercloud/gophercloud/v2/openstack/compute/v2/servers"
 	"github.com/stretchr/testify/mock"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cloud-provider-openstack/pkg/util/errors"
 	"k8s.io/cloud-provider-openstack/pkg/util/metadata"
 )
@@ -193,6 +194,20 @@ func (_m *OpenStackMock) WaitVolumeTargetStatus(ctx context.Context, volumeID st
 	var r0 error
 	if rf, ok := ret.Get(0).(func(string, []string) error); ok {
 		r0 = rf(volumeID, tStatus)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// WaitVolumeTargetStatusWithCustomBackoff provides a mock function with given fields: volumeID, tStatus, backoff
+func (_m *OpenStackMock) WaitVolumeTargetStatusWithCustomBackoff(volumeID string, tStatus []string, backoff *wait.Backoff) error {
+	ret := _m.Called(volumeID, tStatus, backoff)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, []string, *wait.Backoff) error); ok {
+		r0 = rf(volumeID, tStatus, backoff)
 	} else {
 		r0 = ret.Error(0)
 	}
