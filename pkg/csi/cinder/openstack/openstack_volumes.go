@@ -39,12 +39,12 @@ const (
 	operationFinishInitDelay = 1 * time.Second
 	operationFinishFactor    = 1.1
 	operationFinishSteps     = 10
-	diskAttachInitDelay      = 1 * time.Second
-	diskAttachFactor         = 1.2
-	diskAttachSteps          = 15
-	diskDetachInitDelay      = 1 * time.Second
-	diskDetachFactor         = 1.2
-	diskDetachSteps          = 13
+	diskAttachInitDelay      = 7 * time.Second
+	diskAttachFactor         = 1.4
+	diskAttachSteps          = 10
+	diskDetachInitDelay      = 7 * time.Second
+	diskDetachFactor         = 1.4
+	diskDetachSteps          = 10
 	volumeDescription        = "Created by OpenStack Cinder CSI driver"
 )
 
@@ -203,6 +203,12 @@ func (os *OpenStack) AttachVolume(instanceID, volumeID string) (string, error) {
 		return "", fmt.Errorf("failed to attach %s volume to %s compute: %v", volumeID, instanceID, err)
 	}
 
+	//redundant waitDiskAttached, workaround for raise condition in backend
+	err = os.WaitDiskAttached(instanceID, volumeID)
+	if err != nil {
+		return "", err
+	}
+
 	return volume.ID, nil
 }
 
@@ -258,6 +264,33 @@ func (os *OpenStack) WaitVolumeTargetStatus(volumeID string, tStatus []string) e
 	})
 
 	if wait.Interrupted(waitErr) {
+		waitErr = fmt.Errorf("Timeout on waiting for volume %s status to be in %v", volumeID, tStatus)
+	}
+
+	return waitErr
+}
+
+// WaitVolumeTargetStatusWithCustomBackoff waits for volume to be in target state with custom backoff
+func (os *OpenStack) WaitVolumeTargetStatusWithCustomBackoff(volumeID string, tStatus []string, backoff *wait.Backoff) error {
+	waitErr := wait.ExponentialBackoff(*backoff, func() (bool, error) {
+		vol, err := os.GetVolume(volumeID)
+		if err != nil {
+			return false, err
+		}
+		for _, t := range tStatus {
+			if vol.Status == t {
+				return true, nil
+			}
+		}
+		for _, eState := range volumeErrorStates {
+			if vol.Status == eState {
+				return false, fmt.Errorf("Volume is in Error State : %s", vol.Status)
+			}
+		}
+		return false, nil
+	})
+
+	if waitErr == wait.ErrWaitTimeout {
 		waitErr = fmt.Errorf("Timeout on waiting for volume %s status to be in %v", volumeID, tStatus)
 	}
 
