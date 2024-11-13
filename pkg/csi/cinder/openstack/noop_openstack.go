@@ -23,6 +23,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/snapshots"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cloud-provider-openstack/pkg/util/metadata"
 )
 
@@ -30,6 +31,8 @@ type NoopOpenStack struct {
 	bsOpts       BlockStorageOpts
 	metadataOpts metadata.Opts
 }
+
+var _ IOpenStack = &NoopOpenStack{}
 
 func (os *NoopOpenStack) CreateVolume(name string, size int, vtype, availability string, snapshotID string, sourcevolID string, tags *map[string]string) (*volumes.Volume, error) {
 	return nil, fmt.Errorf("CreateVolume is not implemented for ephemeral storage in this configuration")
@@ -60,6 +63,10 @@ func (os *NoopOpenStack) WaitDiskAttached(instanceID string, volumeID string) er
 }
 
 func (os *NoopOpenStack) WaitVolumeTargetStatus(volumeID string, tStatus []string) error {
+	return nil
+}
+
+func (os *NoopOpenStack) WaitVolumeTargetStatusWithCustomBackoff(volumeID string, tStatus []string, backoff *wait.Backoff) error {
 	return nil
 }
 
