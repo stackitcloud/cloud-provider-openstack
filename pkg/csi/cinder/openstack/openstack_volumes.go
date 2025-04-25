@@ -231,7 +231,7 @@ func (os *OpenStack) AttachVolume(ctx context.Context, instanceID, volumeID stri
 	}
 
 	//redundant waitDiskAttached, workaround for raise condition in backend
-	err = os.WaitDiskAttached(instanceID, volumeID)
+	err = os.WaitDiskAttached(ctx, instanceID, volumeID)
 	if err != nil {
 		return "", err
 	}
@@ -298,9 +298,9 @@ func (os *OpenStack) WaitVolumeTargetStatus(ctx context.Context, volumeID string
 }
 
 // WaitVolumeTargetStatusWithCustomBackoff waits for volume to be in target state with custom backoff
-func (os *OpenStack) WaitVolumeTargetStatusWithCustomBackoff(volumeID string, tStatus []string, backoff *wait.Backoff) error {
+func (os *OpenStack) WaitVolumeTargetStatusWithCustomBackoff(ctx context.Context, volumeID string, tStatus []string, backoff *wait.Backoff) error {
 	waitErr := wait.ExponentialBackoff(*backoff, func() (bool, error) {
-		vol, err := os.GetVolume(volumeID)
+		vol, err := os.GetVolume(ctx, volumeID)
 		if err != nil {
 			return false, err
 		}
