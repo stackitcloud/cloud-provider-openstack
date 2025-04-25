@@ -62,6 +62,8 @@ func TestCreateVolume(t *testing.T) {
 	// mock OpenStack
 	properties := map[string]string{cinderCSIClusterIDKey: FakeCluster}
 	osmock.On("CreateVolume", FakeVolName, mock.AnythingOfType("int"), FakeVolType, FakeAvailability, "", "", "", properties).Return(&FakeVol, nil)
+	osmock.On("WaitVolumeTargetStatusWithCustomBackoff", FakeVol.ID, []string{openstack.VolumeAvailableStatus}, mock.AnythingOfType("*wait.Backoff")).Return(nil)
+
 	osmock.On("GetVolumesByName", FakeVolName).Return(FakeVolListEmpty, nil)
 	osmock.On("GetBlockStorageOpts").Return(openstack.BlockStorageOpts{})
 
@@ -156,6 +158,8 @@ func TestCreateVolumeWithParam(t *testing.T) {
 	// mock OpenStack
 	properties := map[string]string{cinderCSIClusterIDKey: FakeCluster}
 	osmock.On("CreateVolume", FakeVolName, mock.AnythingOfType("int"), "dummyVolType", "cinder", "", "", "", properties).Return(&FakeVol, nil)
+	osmock.On("WaitVolumeTargetStatusWithCustomBackoff", FakeVol.ID, []string{openstack.VolumeAvailableStatus}, mock.AnythingOfType("*wait.Backoff")).Return(nil)
+
 	osmock.On("GetVolumesByName", FakeVolName).Return(FakeVolListEmpty, nil)
 	osmock.On("GetBlockStorageOpts").Return(openstack.BlockStorageOpts{})
 
@@ -206,6 +210,7 @@ func TestCreateVolumeWithIgnoreVolumeAZ(t *testing.T) {
 
 	properties := map[string]string{cinderCSIClusterIDKey: FakeCluster}
 	osmock.On("CreateVolume", FakeVolName, mock.AnythingOfType("int"), FakeVolType, "cinder", "", "", "", properties).Return(&FakeVol, nil)
+	osmock.On("WaitVolumeTargetStatusWithCustomBackoff", FakeVol.ID, []string{openstack.VolumeAvailableStatus}, mock.AnythingOfType("*wait.Backoff")).Return(nil)
 	osmock.On("GetVolumesByName", FakeVolName).Return(FakeVolListEmpty, nil)
 	osmock.On("GetBlockStorageOpts").Return(openstack.BlockStorageOpts{IgnoreVolumeAZ: true})
 
@@ -289,6 +294,7 @@ func TestCreateVolumeWithTopologyDisabled(t *testing.T) {
 
 			properties := map[string]string{cinderCSIClusterIDKey: FakeCluster}
 			osmock.On("CreateVolume", FakeVolName, mock.AnythingOfType("int"), FakeVolType, tt.expectedVolumeAZ, "", "", "", properties).Return(&FakeVol, nil)
+			osmock.On("WaitVolumeTargetStatusWithCustomBackoff", FakeVol.ID, []string{openstack.VolumeAvailableStatus}, mock.AnythingOfType("*wait.Backoff")).Return(nil)
 			osmock.On("GetVolumesByName", FakeVolName).Return(FakeVolListEmpty, nil)
 			osmock.On("GetBlockStorageOpts").Return(openstack.BlockStorageOpts{})
 
@@ -335,6 +341,7 @@ func TestCreateVolumeWithExtraMetadata(t *testing.T) {
 		sharedcsi.PvcNamespaceKey: FakePVCNamespace,
 	}
 	osmock.On("CreateVolume", FakeVolName, mock.AnythingOfType("int"), FakeVolType, FakeAvailability, "", "", "", properties).Return(&FakeVol, nil)
+	osmock.On("WaitVolumeTargetStatusWithCustomBackoff", FakeVol.ID, []string{openstack.VolumeAvailableStatus}, mock.AnythingOfType("*wait.Backoff")).Return(nil)
 	osmock.On("GetVolumesByName", FakeVolName).Return(FakeVolListEmpty, nil)
 	osmock.On("GetBlockStorageOpts").Return(openstack.BlockStorageOpts{})
 
@@ -375,6 +382,7 @@ func TestCreateVolumeFromSnapshot(t *testing.T) {
 
 	properties := map[string]string{cinderCSIClusterIDKey: FakeCluster}
 	osmock.On("CreateVolume", FakeVolName, mock.AnythingOfType("int"), FakeVolType, "", FakeSnapshotID, "", "", properties).Return(&FakeVolFromSnapshot, nil)
+	osmock.On("WaitVolumeTargetStatusWithCustomBackoff", FakeVolFromSnapshot.ID, []string{openstack.VolumeAvailableStatus}, mock.AnythingOfType("*wait.Backoff")).Return(nil)
 	osmock.On("GetVolumesByName", FakeVolName).Return(FakeVolListEmpty, nil)
 	osmock.On("GetBlockStorageOpts").Return(openstack.BlockStorageOpts{})
 
@@ -422,6 +430,7 @@ func TestCreateVolumeFromSourceVolume(t *testing.T) {
 
 	properties := map[string]string{cinderCSIClusterIDKey: FakeCluster}
 	osmock.On("CreateVolume", FakeVolName, mock.AnythingOfType("int"), FakeVolType, "", "", FakeVolID, "", properties).Return(&FakeVolFromSourceVolume, nil)
+	osmock.On("WaitVolumeTargetStatusWithCustomBackoff", FakeVolFromSourceVolume.ID, []string{openstack.VolumeAvailableStatus}, mock.AnythingOfType("*wait.Backoff")).Return(nil)
 	osmock.On("GetVolumesByName", FakeVolName).Return(FakeVolListEmpty, nil)
 	osmock.On("GetBlockStorageOpts").Return(openstack.BlockStorageOpts{})
 
