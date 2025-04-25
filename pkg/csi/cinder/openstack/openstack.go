@@ -55,7 +55,7 @@ type IOpenStack interface {
 	DetachVolume(ctx context.Context, instanceID, volumeID string) error
 	WaitDiskDetached(ctx context.Context, instanceID string, volumeID string) error
 	WaitVolumeTargetStatus(ctx context.Context, volumeID string, tStatus []string) error
-	WaitVolumeTargetStatusWithCustomBackoff(volumeID string, tStatus []string, backoff *wait.Backoff) error
+	WaitVolumeTargetStatusWithCustomBackoff(ctx context.Context, volumeID string, tStatus []string, backoff *wait.Backoff) error
 	GetAttachmentDiskPath(ctx context.Context, instanceID, volumeID string) (string, error)
 	GetVolume(ctx context.Context, volumeID string) (*volumes.Volume, error)
 	GetVolumesByName(ctx context.Context, name string) ([]volumes.Volume, error)

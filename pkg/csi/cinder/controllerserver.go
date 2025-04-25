@@ -121,8 +121,8 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 			return nil, status.Error(codes.AlreadyExists, "Volume Already exists with same name and different capacity")
 		}
 
-		if volumes[0].Status != openstack.VolumeAvailableStatus {
-			return nil, status.Error(codes.Internal, fmt.Sprintf("Volume %s is not in available state", volumes[0].ID))
+		if vols[0].Status != openstack.VolumeAvailableStatus {
+			return nil, status.Error(codes.Internal, fmt.Sprintf("Volume %s is not in available state", vols[0].ID))
 		}
 		klog.V(4).Infof("Volume %s already exists in Availability Zone: %s of size %d GiB", vols[0].ID, vols[0].AvailabilityZone, vols[0].Size)
 		return getCreateVolumeResponse(&vols[0], nil, ignoreVolumeAZ, req.GetAccessibilityRequirements()), nil
@@ -253,7 +253,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}
 
 	targetStatus := []string{openstack.VolumeAvailableStatus}
-	err = cloud.WaitVolumeTargetStatusWithCustomBackoff(vol.ID, targetStatus,
+	err = cloud.WaitVolumeTargetStatusWithCustomBackoff(ctx, vol.ID, targetStatus,
 		&wait.Backoff{
 			Duration: 20 * time.Second,
 			Steps:    5,
