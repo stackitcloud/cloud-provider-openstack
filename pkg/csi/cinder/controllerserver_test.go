@@ -57,6 +57,7 @@ func TestCreateVolume(t *testing.T) {
 	properties := map[string]string{cinderCSIClusterIDKey: FakeCluster}
 	// CreateVolume(name string, size int, vtype, availability string, snapshotID string, sourceVolID string, sourceBackupID string, tags map[string]string) (string, string, int, error)
 	osmock.On("CreateVolume", FakeVolName, mock.AnythingOfType("int"), FakeVolType, FakeAvailability, "", "", "", properties).Return(&FakeVol, nil)
+	osmock.On("WaitVolumeTargetStatusWithCustomBackoff", FakeVol.ID, []string{openstack.VolumeAvailableStatus}, mock.AnythingOfType("*wait.Backoff")).Return(nil)
 
 	osmock.On("GetVolumesByName", FakeVolName).Return(FakeVolListEmpty, nil)
 	// Init assert
@@ -104,6 +105,7 @@ func TestCreateVolumeWithParam(t *testing.T) {
 	// CreateVolume(name string, size int, vtype, availability string, snapshotID string, sourceVolID string, sourceBackupID string, tags map[string]string) (string, string, int, error)
 	// Vol type and availability comes from CreateVolumeRequest.Parameters
 	osmock.On("CreateVolume", FakeVolName, mock.AnythingOfType("int"), "dummyVolType", "cinder", "", "", "", properties).Return(&FakeVol, nil)
+	osmock.On("WaitVolumeTargetStatusWithCustomBackoff", FakeVol.ID, []string{openstack.VolumeAvailableStatus}, mock.AnythingOfType("*wait.Backoff")).Return(nil)
 
 	osmock.On("GetVolumesByName", FakeVolName).Return(FakeVolListEmpty, nil)
 	// Init assert
@@ -159,6 +161,7 @@ func TestCreateVolumeWithExtraMetadata(t *testing.T) {
 	}
 	// CreateVolume(name string, size int, vtype, availability string, snapshotID string, sourceVolID string, sourceBackupID string, tags map[string]string) (string, string, int, error)
 	osmock.On("CreateVolume", FakeVolName, mock.AnythingOfType("int"), FakeVolType, FakeAvailability, "", "", "", properties).Return(&FakeVol, nil)
+	osmock.On("WaitVolumeTargetStatusWithCustomBackoff", FakeVol.ID, []string{openstack.VolumeAvailableStatus}, mock.AnythingOfType("*wait.Backoff")).Return(nil)
 
 	osmock.On("GetVolumesByName", FakeVolName).Return(FakeVolListEmpty, nil)
 
@@ -199,6 +202,7 @@ func TestCreateVolumeFromSnapshot(t *testing.T) {
 	properties := map[string]string{cinderCSIClusterIDKey: FakeCluster}
 	// CreateVolume(name string, size int, vtype, availability string, snapshotID string, sourceVolID string, sourceBackupID string, tags map[string]string) (string, string, int, error)
 	osmock.On("CreateVolume", FakeVolName, mock.AnythingOfType("int"), FakeVolType, "", FakeSnapshotID, "", "", properties).Return(&FakeVolFromSnapshot, nil)
+	osmock.On("WaitVolumeTargetStatusWithCustomBackoff", FakeVolFromSnapshot.ID, []string{openstack.VolumeAvailableStatus}, mock.AnythingOfType("*wait.Backoff")).Return(nil)
 	osmock.On("GetVolumesByName", FakeVolName).Return(FakeVolListEmpty, nil)
 
 	// Init assert
@@ -246,6 +250,7 @@ func TestCreateVolumeFromSourceVolume(t *testing.T) {
 	properties := map[string]string{cinderCSIClusterIDKey: FakeCluster}
 	// CreateVolume(name string, size int, vtype, availability string, snapshotID string, sourceVolID string, sourceBackupID string, tags map[string]string) (string, string, int, error)
 	osmock.On("CreateVolume", FakeVolName, mock.AnythingOfType("int"), FakeVolType, "", "", FakeVolID, "", properties).Return(&FakeVolFromSourceVolume, nil)
+	osmock.On("WaitVolumeTargetStatusWithCustomBackoff", FakeVolFromSourceVolume.ID, []string{openstack.VolumeAvailableStatus}, mock.AnythingOfType("*wait.Backoff")).Return(nil)
 	osmock.On("GetVolumesByName", FakeVolName).Return(FakeVolListEmpty, nil)
 
 	// Init assert
