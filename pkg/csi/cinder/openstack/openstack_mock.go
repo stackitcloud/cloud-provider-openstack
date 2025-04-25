@@ -202,7 +202,7 @@ func (_m *OpenStackMock) WaitVolumeTargetStatus(ctx context.Context, volumeID st
 }
 
 // WaitVolumeTargetStatusWithCustomBackoff provides a mock function with given fields: volumeID, tStatus, backoff
-func (_m *OpenStackMock) WaitVolumeTargetStatusWithCustomBackoff(volumeID string, tStatus []string, backoff *wait.Backoff) error {
+func (_m *OpenStackMock) WaitVolumeTargetStatusWithCustomBackoff(ctx context.Context, volumeID string, tStatus []string, backoff *wait.Backoff) error {
 	ret := _m.Called(volumeID, tStatus, backoff)
 
 	var r0 error
